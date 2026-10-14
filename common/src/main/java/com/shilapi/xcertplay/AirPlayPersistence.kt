@@ -46,6 +46,7 @@ object AirPlayPersistence {
     private const val KEY_ADVANCED_AUDIO_CHANNEL_MAPPING = "advanced_audio_channel_mapping"
     private const val KEY_AUDIO_FOCUS_ENABLED = "audio_focus_enabled"
     private const val KEY_AUDIO_FOCUS_AUTO_YIELD = "audio_focus_auto_yield"
+    private const val KEY_NAV_DUCK_ENABLED = "nav_duck_enabled"
     private const val KEY_DISABLE_MEDIA_KEY_AUDIO_FOCUS = "disable_media_key_audio_focus"
     private const val KEY_MEDIA_AUDIO_CHANNEL = "media_audio_channel"
     private const val KEY_NAVIGATION_AUDIO_CHANNEL = "navigation_audio_channel"
@@ -244,6 +245,17 @@ object AirPlayPersistence {
     fun saveAudioFocusAutoYield(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_AUDIO_FOCUS_AUTO_YIELD, enabled)
+            .apply()
+    }
+
+    /** fix4: optionally lower the media track while CarPlay navigation is speaking. */
+    fun loadNavDuckEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_NAV_DUCK_ENABLED, true)
+
+    fun saveNavDuckEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_NAV_DUCK_ENABLED, enabled)
             .apply()
     }
 

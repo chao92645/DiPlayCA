@@ -5574,6 +5574,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             markReconnectNeeded()
         }
         parent.addView(dependent)
+        // fix4: kept outside the audio-focus column and always visible. It lowers the media track
+        // directly, so it does not depend on the audio-focus switch above.
+        toggle(parent, getString(R.string.nav_duck), getString(R.string.nav_duck_desc),
+            AirPlayPersistence.loadNavDuckEnabled(this)) {
+            AirPlayPersistence.saveNavDuckEnabled(this, it)
+            markReconnectNeeded()
+        }
     }
 
 

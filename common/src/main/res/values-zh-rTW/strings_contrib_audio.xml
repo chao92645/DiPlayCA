@@ -8,4 +8,6 @@
     <string name="contrib_audio_home_toggle_audio_focus_desc">CarPlay 媒體會向系統要求音訊焦點。若開啟後沒有聲音（部分車機的音訊焦點處理可能異常），請關閉此選項。變更會在重新連線後生效。</string>
     <string name="audio_focus_auto_yield">暫時失去音訊焦點時將媒體靜音</string>
     <string name="audio_focus_auto_yield_desc">啟用音訊焦點時，Android 音訊中斷（包括來電）會讓媒體靜音；焦點恢復後會繼續播放聲音。若車機無法恢復音訊焦點，請關閉此選項。變更會在重新連線後生效。</string>
+    <string name="nav_duck">導航播報時壓低音樂</string>
+    <string name="nav_duck_desc">CarPlay 導航播報期間降低媒體音量，播報結束後恢復。若車機會自行管理音量，可關閉此選項。變更會在重新連線後生效。</string>
 </resources>

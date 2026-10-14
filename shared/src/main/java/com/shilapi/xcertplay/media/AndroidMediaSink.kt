@@ -51,6 +51,9 @@ internal class AudioFocusCoordinator(
     private var request: AudioFocusRequestCompat? = null
     private var requestedChannel: AudioChannel? = null
     private var mediaVolume = FULL_VOLUME
+    // fix4: a monotonic "navigation spoke" pulse shared by every renderer this sink owns.
+    // The navigation renderer bumps it and each media renderer watches it to duck its own track.
+    internal var navPulse = 0
     private var closed = false
     private var focusGeneration = 0L
     private var currentListener = listenerFor(focusGeneration)
@@ -186,6 +189,8 @@ class AndroidMediaSink(
     private val advancedAudioChannelMapping: Boolean = false,
     private val audioFocusEnabled: Boolean = false,
     private val audioFocusAutoYield: Boolean = true,
+    /** fix4: lower the media track while CarPlay navigation is speaking. */
+    private val navDuckEnabled: Boolean = true,
     private val mediaChannel: Int = 0,
     private val navigationChannel: Int = 0,
     context: Context? = null,
@@ -685,6 +690,7 @@ class AndroidMediaSink(
                 appContext != null && BydBluetoothSuspend.isSuspendedByUs(appContext),
             echoReference = echoReference,
             voiceFilter = callVoiceFilter && format.audioType == TELEPHONY_AUDIO_TYPE,
+            navDuckEnabled = navDuckEnabled,
         ).also { audioRenderers[id] = it }
     }
 
@@ -1700,6 +1706,8 @@ private class AudioRenderer(
     /** Receives the played call audio so the call microphone can cancel its echo. */
     private val echoReference: EchoReference? = null,
     voiceFilter: Boolean = false,
+    /** fix4: duck this renderer's media track while navigation is speaking. */
+    private val navDuckEnabled: Boolean = true,
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int)
 
@@ -1708,6 +1716,12 @@ private class AudioRenderer(
 
     private var trackAttributes: AudioAttributes? = null
     private var mappedChannel: AudioChannel? = null
+    // fix4: media-duck state, driven by the coordinator's shared navPulse. Kept as plain
+    // fields (not a helper) to mirror the shipped dex patch one-to-one.
+    private var navSynced = false
+    private var lastSeenNavPulse = 0
+    private var silentTicks = 0
+    private var ducked = false
     private val navigationPlaybackToken = NavigationPlayback.open()
     private var actualLegacyStreamType: Int? = null
     private val queue = LinkedBlockingQueue<AudioPacket>(MAX_QUEUED_PACKETS)
@@ -1979,6 +1993,9 @@ private class AudioRenderer(
     private fun channelOverride(channel: AudioChannel): Int = when (channel) {
         AudioChannel.MEDIA -> mediaChannel
         AudioChannel.NAVIGATION -> navigationChannel
+        // fix5: route Siri/assistant speech onto the media stream so the head unit's media
+        // volume keys reach it (was the `else -> 0` usage-routing default).
+        AudioChannel.ASSISTANT -> AudioManager.STREAM_MUSIC
         else -> 0
     }
 
@@ -2112,7 +2129,49 @@ private class AudioRenderer(
             .putLong(OPUS_SEEK_PRE_ROLL_NANOS)
             .array()
 
+    /**
+     * fix4: while the navigation channel is speaking, lower this media track, then restore it
+     * after navigation has been silent for a short run of packets. Both channels share the
+     * coordinator's [AudioFocusCoordinator.navPulse] because every renderer in one sink shares
+     * that coordinator.
+     *
+     * This is a line-by-line port of the shipped dex patch, so three details are deliberate:
+     *  - it calls [AudioTrack.setStereoVolume] directly instead of the coordinator's focus-volume
+     *    path (the two are independent mechanisms and must not share state);
+     *  - the restore threshold is a count of packets, not a duration;
+     *  - the `track == null` checkpoints sit exactly where the bytecode placed them, including
+     *    the fact that the rising edge updates no field at all when the track is missing.
+     */
+    private fun applyNavigationDuck() {
+        when (mappedChannel) {
+            AudioChannel.NAVIGATION -> audioFocusCoordinator.navPulse++
+            AudioChannel.MEDIA -> {
+                val pulse = audioFocusCoordinator.navPulse
+                if (!navSynced) {
+                    navSynced = true
+                    lastSeenNavPulse = pulse
+                } else if (pulse != lastSeenNavPulse) {
+                    val t = track ?: return
+                    lastSeenNavPulse = pulse
+                    silentTicks = 0
+                    if (!ducked) {
+                        ducked = true
+                        t.setStereoVolume(0.2f, 0.2f) // 0x3E4CCCCD in the dex patch
+                    }
+                } else {
+                    silentTicks++
+                    if (silentTicks > 40 && ducked) { // 40 packets, matching CONST_16 40
+                        ducked = false
+                        track?.setStereoVolume(1.0f, 1.0f) // 0x3F800000 in the dex patch
+                    }
+                }
+            }
+            else -> {}
+        }
+    }
+
     private fun handle(packet: AudioPacket) {
+        if (navDuckEnabled) applyNavigationDuck()
         val rtp = packet.rtp
         val timestampUs = sampleTimestampUs(packet.sample)
         when (format.codec) {
