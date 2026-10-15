@@ -75,4 +75,22 @@ class UpdateCatalogTest {
     fun returnsNullForAnEmptyReleaseList() {
         assertNull(UpdateCatalog.parse("[]"))
     }
+
+    @Test
+    fun picksTheNewestReleaseWhateverTheOrder() {
+        // Oldest first, as Gitee can return them, to prove the newest is chosen by version.
+        val json = """
+            [
+              {"tag_name": "DiPlay-CA-0.2.19", "draft": false, "assets": [
+                {"name": "DiPlay-CA-0.2.19.apk", "browser_download_url": "https://gitee.com/aschao/DiPlayCA/releases/download/DiPlay-CA-0.2.19/DiPlay-CA-0.2.19.apk"},
+                {"name": "SHA256SUMS.txt", "browser_download_url": "https://gitee.com/aschao/DiPlayCA/releases/download/DiPlay-CA-0.2.19/SHA256SUMS.txt"}
+              ]},
+              {"tag_name": "DiPlay-CA-0.2.20", "draft": false, "assets": [
+                {"name": "DiPlay-CA-0.2.20.apk", "browser_download_url": "https://gitee.com/aschao/DiPlayCA/releases/download/DiPlay-CA-0.2.20/DiPlay-CA-0.2.20.apk"},
+                {"name": "SHA256SUMS.txt", "browser_download_url": "https://gitee.com/aschao/DiPlayCA/releases/download/DiPlay-CA-0.2.20/SHA256SUMS.txt"}
+              ]}
+            ]
+        """.trimIndent()
+        assertEquals("DiPlay-CA-0.2.20", UpdateCatalog.parse(json)?.tagName)
+    }
 }

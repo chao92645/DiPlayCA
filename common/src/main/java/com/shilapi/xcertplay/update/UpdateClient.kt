@@ -10,7 +10,16 @@ import java.net.URLConnection
 
 internal object UpdateClient {
     internal const val RELEASES_URL =
-        "https://api.github.com/repos/chao92645/DiPlayCA/releases?per_page=3"
+        "https://api.github.com/repos/chao92645/DiPlayCA/releases?per_page=20"
+    internal const val GITEE_RELEASES_URL =
+        "https://gitee.com/api/v5/repos/aschao/DiPlayCA/releases?per_page=20"
+
+    /**
+     * GitHub serves release assets from a host that is frequently throttled or blocked in
+     * mainland China, so those downloads are tried through a mirror before the direct URL.
+     * Gitee already serves from a domestic host and is used as given.
+     */
+    private const val GITHUB_ACCELERATOR = "https://gh-proxy.com/"
     private const val CONNECT_TIMEOUT_MILLIS = 10_000
     private const val READ_TIMEOUT_MILLIS = 30_000
     private const val MAXIMUM_TEXT_BYTES = 4 * 1024 * 1024
@@ -41,7 +50,26 @@ internal object UpdateClient {
         }
     }
 
+    /** The URLs to try for a download, most likely to succeed first. */
+    internal fun mirrorCandidates(url: String): List<String> =
+        if (url.startsWith("https://github.com/")) listOf(GITHUB_ACCELERATOR + url, url)
+        else listOf(url)
+
+    /** Downloads [url], retrying through every mirror candidate until one succeeds. */
     internal fun download(url: String, destination: File, onProgress: (Long, Long?) -> Unit) {
+        var lastFailure: Throwable? = null
+        for (candidate in mirrorCandidates(url)) {
+            try {
+                downloadOnce(candidate, destination, onProgress)
+                return
+            } catch (failure: Throwable) {
+                lastFailure = failure
+            }
+        }
+        throw lastFailure ?: IOException("Download from $url failed")
+    }
+
+    private fun downloadOnce(url: String, destination: File, onProgress: (Long, Long?) -> Unit) {
         destination.parentFile?.mkdirs()
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
