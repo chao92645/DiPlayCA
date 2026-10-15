@@ -89,6 +89,7 @@ import com.shilapi.xcertplay.airplay.AirPlaySession
 import com.shilapi.xcertplay.airplay.AirPlaySessionListener
 import com.shilapi.xcertplay.airplay.CarPlayMediaEngine
 import com.shilapi.xcertplay.airplay.SafeAreaRect
+import com.shilapi.xcertplay.fcewheel.FceWheelKeys
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.location.AndroidCarPlayLocationProvider
 import com.shilapi.xcertplay.media.AndroidMediaSink
@@ -1523,6 +1524,14 @@ class CarPlayHostActivity : ComponentActivity() {
             inCall = inCall(this),
         )
         if (downOrUp && mediaPress != null) {
+            // The FCE wheel-key listener claims the wheel while it runs, so sending here as well
+            // would deliver every press twice.
+            if (FceWheelKeys.handlesWheelKeys()) {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    appendLog("Media: wheel key ${event.keyCode} left to the FCE listener")
+                }
+                return true
+            }
             // A media button is a tap, and BYD sends each tap as an instant down/up pair: send once,
             // on the press. The release is swallowed rather than passed on, or BYD's own player would
             // receive an unpaired key.
