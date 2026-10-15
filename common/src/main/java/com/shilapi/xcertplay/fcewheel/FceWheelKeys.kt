@@ -26,10 +26,12 @@ import java.lang.reflect.Method
  * over adb without rebuilding the APK:
  *
  *  - `fce_wheel_keys.off` - disable this listener entirely; the upstream window route takes over.
- *  - `fce_wheel_keys.yield_on_bt` - while the car's media source is `btaudio`, the head unit's own
+ *  - `fce_wheel_keys.send_on_bt` - while the car's media source is `btaudio`, the head unit's own
  *    Bluetooth (AVRCP) control already drives the iPhone's music, so forwarding the media keys too
- *    would double-fire; this hands the press back to the head unit then. Off by default, because
- *    the source is read live and the double-fire has not been confirmed on this head unit.
+ *    would double-fire. The press is therefore handed back to the car by default, and this sentinel
+ *    forces this listener to send it anyway - the escape hatch for a head unit whose own AVRCP does
+ *    not take the wheel over. Confirmed on the T7 (inCall) head unit: with the hand-off off, a
+ *    Bluetooth-source press moved two tracks instead of one.
  */
 internal object FceWheelKeys {
     private const val TAG = "FceWheelKeys"
@@ -50,7 +52,7 @@ internal object FceWheelKeys {
     private const val KEYCODE_PREVIOUS = 88
 
     private const val SENTINEL_OFF = "fce_wheel_keys.off"
-    private const val SENTINEL_YIELD_ON_BT = "fce_wheel_keys.yield_on_bt"
+    private const val SENTINEL_SEND_ON_BT = "fce_wheel_keys.send_on_bt"
 
     /** The car's Bluetooth media source, which brings its own AVRCP control for the wheel. */
     private const val SOURCE_BLUETOOTH = "btaudio"
@@ -182,11 +184,12 @@ internal object FceWheelKeys {
     }
 
     /**
-     * With `fce_wheel_keys.yield_on_bt` present and the car's source on Bluetooth, the head unit's
-     * own AVRCP already drives the iPhone, so this press is left to it rather than sent twice.
+     * While the car's source is Bluetooth, the head unit's own AVRCP already drives the iPhone, so
+     * this press is left to it rather than sent twice. `fce_wheel_keys.send_on_bt` overrides that
+     * and makes this listener send the press itself, for a head unit whose AVRCP leaves it alone.
      */
     private fun leaveToCarBluetooth(keyCode: Int): Boolean {
-        if (!yieldSentinelPresent()) return false
+        if (sendOnBtSentinelPresent()) return false
         val source = realSource()
         if (source != SOURCE_BLUETOOTH) return false
         Log.i(TAG, "wheel key $keyCode -> left to car Bluetooth (realSource=$source)")
@@ -219,5 +222,5 @@ internal object FceWheelKeys {
 
     private fun offSentinelPresent(): Boolean = sentinel(SENTINEL_OFF)?.exists() == true
 
-    private fun yieldSentinelPresent(): Boolean = sentinel(SENTINEL_YIELD_ON_BT)?.exists() == true
+    private fun sendOnBtSentinelPresent(): Boolean = sentinel(SENTINEL_SEND_ON_BT)?.exists() == true
 }
