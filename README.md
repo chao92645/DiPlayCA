@@ -1,5 +1,9 @@
 # DiPlay
 
+> **长安（EADO）定制分支** — 本仓库是 DiPlay 的**长安 21 款逸动 PLUS 定制版**，基于原版派生，分支 `custom-0219`。
+> 包名 `com.shihab.diplay`，安装前请先卸载官方版本；针对长安 21 款逸动 PLUS 车机系统做了适配。
+> 具体改动与下载见 [Releases](https://github.com/chao92645/DiPlayCA/releases) ｜ 详见 [README.CA.md](README.CA.md)。
+
 [English](README.md) · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md)
 
 **CarPlay for compatible BYD Android head units.** Wired and wireless, with the familiar DiAuto interface. Independent app: `com.shihab.diplay`.
